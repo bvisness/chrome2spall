@@ -1,6 +1,6 @@
 # chrome2spall (a hack)
 
-This is a tool to convert Chrome performance profiles to a format that works with [spall]9https://github.com/colrdavidson/spall).
+This is a tool to convert Chrome performance profiles to a format that works with [spall](https://github.com/colrdavidson/spall).
 
 ## Install
 
