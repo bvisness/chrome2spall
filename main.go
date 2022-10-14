@@ -167,7 +167,7 @@ func convertFile(r io.Reader) {
 							Type:     "E",
 							Pid:      event.Pid,
 							Tid:      event.Tid,
-							Time:     profile.Time,
+							Time:     profile.Time - int64(i-ancestorIndex), // fudge for spall's unstable sorts
 						}
 						fmt.Printf("%s,\n", string(must1(json.Marshal(endEvent))))
 						profile.Stack = profile.Stack[:i]
@@ -188,7 +188,7 @@ func convertFile(r io.Reader) {
 							Type:     "B",
 							Pid:      event.Pid,
 							Tid:      event.Tid,
-							Time:     profile.Time,
+							Time:     profile.Time + int64(len(nodesToBegin)-i), // fudge for spall's unstable sorts
 						}
 						fmt.Printf("%s,\n", string(must1(json.Marshal(beginEvent))))
 						profile.Stack = append(profile.Stack, nodeID)
