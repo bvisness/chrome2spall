@@ -177,9 +177,10 @@ func convertFile(r io.Reader) {
 					for i := len(nodesToBegin) - 1; i >= 0; i-- {
 						nodeID := nodesToBegin[i]
 						node := profile.Nodes[nodeID]
-						name := node.CallFrame.FunctionName
+						cf := node.CallFrame
+						name := cf.FunctionName
 						if name == "" {
-							name = "(anonymous)"
+							name = fmt.Sprintf("(anonymous %d:%d:%d)", cf.ScriptID, cf.LineNumber, cf.ColumnNumber)
 						}
 						beginEvent := Event{
 							Category: "function",
