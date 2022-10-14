@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/constraints"
 )
 
 var rootCmd *cobra.Command
@@ -38,18 +39,21 @@ func main() {
 }
 
 func convertFile(r io.Reader) {
+	fmt.Println("[")
+	defer fmt.Println("]")
+
 	type profileState struct {
-		Pid   int
-		Time  int64
-		Nodes map[int]Node
-		Stack []int
+		Pid, Tid int
+		Time     int64
+		Nodes    map[int]Node
+		Stack    []int
 	}
 	profiles := make(map[int]*profileState)
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		rawline := scanner.Text()
-		line := strings.Trim(rawline, "[],\n")
+		line := scanner.Text()
+		line = strings.Trim(line, "[],\n")
 
 		var event Event
 		err := json.Unmarshal([]byte(line), &event)
@@ -68,6 +72,7 @@ func convertFile(r io.Reader) {
 
 			profiles[event.Pid] = &profileState{
 				Pid:   event.Pid,
+				Tid:   event.Tid,
 				Time:  args.Data.StartTime,
 				Nodes: make(map[int]Node),
 			}
@@ -167,7 +172,7 @@ func convertFile(r io.Reader) {
 							Type:     "E",
 							Pid:      event.Pid,
 							Tid:      event.Tid,
-							Time:     profile.Time - int64(i-ancestorIndex), // fudge for spall's unstable sorts
+							Time:     profile.Time - int64(min(i-ancestorIndex, 49)), // fudge for spall's unstable sorts
 						}
 						fmt.Printf("%s,\n", string(must1(json.Marshal(endEvent))))
 						profile.Stack = profile.Stack[:i]
@@ -188,7 +193,7 @@ func convertFile(r io.Reader) {
 							Type:     "B",
 							Pid:      event.Pid,
 							Tid:      event.Tid,
-							Time:     profile.Time + int64(len(nodesToBegin)-i), // fudge for spall's unstable sorts
+							Time:     profile.Time + int64(min(len(nodesToBegin)-i, 49)), // fudge for spall's unstable sorts
 						}
 						fmt.Printf("%s,\n", string(must1(json.Marshal(beginEvent))))
 						profile.Stack = append(profile.Stack, nodeID)
@@ -197,11 +202,26 @@ func convertFile(r io.Reader) {
 			}
 		} else {
 			// pass the line through unchanged
-			fmt.Fprintln(os.Stdout, rawline)
+			fmt.Printf("%s,\n", line)
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "reading standard input:", err)
+	}
+
+	// Pop everything left on the stacks
+	for _, profile := range profiles {
+		for i := len(profile.Stack) - 1; i >= 0; i-- {
+			endEvent := Event{
+				Category: "function",
+				Type:     "E",
+				Pid:      profile.Pid,
+				Tid:      profile.Tid,
+				Time:     profile.Time - int64(i), // fudge for spall's unstable sorts
+			}
+			fmt.Printf("%s,\n", string(must1(json.Marshal(endEvent))))
+			profile.Stack = profile.Stack[:i]
+		}
 	}
 }
 
@@ -285,4 +305,12 @@ func must1[T any](v T, err error) T {
 		panic(err)
 	}
 	return v
+}
+
+func min[T constraints.Ordered](a, b T) T {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
 }
