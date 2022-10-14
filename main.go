@@ -91,6 +91,7 @@ func convertFile(r io.Reader) {
 
 			for i := range args.Data.CPUProfile.Samples {
 				topNodeID := args.Data.CPUProfile.Samples[i]
+				topNode := profile.Nodes[topNodeID]
 				timeDelta := args.Data.TimeDeltas[i]
 
 				profile.Time += timeDelta
@@ -102,6 +103,20 @@ func convertFile(r io.Reader) {
 
 				if currentTopID == topNodeID {
 					// no change, keep on ticking
+				} else if topNode.CallFrame.CodeType == "other" && topNode.CallFrame.FunctionName == "(garbage collector)" {
+					// Garbage collections are special. Don't treat them as a
+					// stack change; push them as new events unconditionally.
+					// They'll be popped by the next legitimate event.
+					beginEvent := Event{
+						Category: "function",
+						Name:     topNode.CallFrame.FunctionName,
+						Type:     "B",
+						Pid:      event.Pid,
+						Tid:      event.Tid,
+						Time:     profile.Time,
+					}
+					fmt.Printf("%s,\n", string(must1(json.Marshal(beginEvent))))
+					profile.Stack = append(profile.Stack, topNodeID)
 				} else {
 					// Stack change! Starting at new top node, follow parents
 					// until you find an ancestor already in the stack (or
